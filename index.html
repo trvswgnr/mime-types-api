@@ -8,5 +8,101 @@
 <body>
     <h1>MIME Types API</h1>
     <p>API to get MIME types of files</p>
+    <p>Usage: <code>https://mime-types-api.vercel.app/api/ext/{extension}</code></p>
+    <p>Example: <code>https://mime-types-api.vercel.app/api/ext/pdf</code></p>
+
+    <h2>Endpoints</h2>
+    <h5>`GET` /api/ext/{extension}</h5>
+    <p>Get MIME types of a file extension</p>
+    <p>Example: <code>https://mime-types-api.vercel.app/api/ext/pdf</code></p>
+    <p>Response:
+        <pre>{
+  "data": ["application/pdf"],
+  "links": {
+    "parent": {
+      "href": "https://mime-types-api.vercel.app/api/345"
+    }
+  }
+}</pre>
+</p>
+    <h5>`GET` /api/{id}</h5>
+    <p>Get a MIME type by its id</p>
+    <p>Example: <code>https://mime-types-api.vercel.app/api/345</code></p>
+    <p>Response:
+        <pre>{
+  "data": {
+    "id": 345,
+    "name": "application/pdf",
+    "description": "Portable Document Format (PDF) is a document file format originally from Adobe, based on PostScript. It has many subsets.",
+    "deprecated": null,
+    "use_instead": null
+  },
+  "links": {
+    "links": {
+      "href": "http://mime-types-api.vercel.app/api/345/links",
+      "type": "application/json",
+      "method": "GET"
+    },
+    "extensions": {
+      "href": "http://mime-types-api.vercel.app/api/345/extensions",
+      "type": "application/json",
+      "method": "GET"
+    },
+    "self": {
+      "href": "http://mime-types-api.vercel.app/api/345",
+      "type": "application/json",
+      "method": "GET"
+    }
+  }
+}</pre>
+</p>
+    <h5>`GET` /api/{id}/links</h5>
+    <p>Get links of a MIME type by its id</p>
+    <p>Example: <code>https://mime-types-api.vercel.app/api/345/links</code></p>
+    <p>Response:
+        <pre>{
+  "data": {
+    "id": 389,
+    "mime_type_id": 345,
+    "deprecates": "application/x-pdf",
+    "related_to": "",
+    "parent_of": "",
+    "alternative_to": ""
+  },
+  "links": {
+    "parent": {
+      "href": "http://mime-types-api.vercel.app/api/345",
+      "type": "application/json",
+      "method": "GET"
+    },
+    "self": {
+      "href": "http://mime-types-api.vercel.app/api/345/links",
+      "type": "application/json",
+      "method": "GET"
+    }
+  }
+}</pre>
+</p>
+    <h5>`GET` /api/{id}/extensions</h5>
+    <p>Get extensions of a MIME type by its id</p>
+    <p>Example: <code>https://mime-types-api.vercel.app/api/345/extensions</code></p>
+    <p>Response:
+        <pre>{
+  "data": [{ "id": 519, "name": ".pdf", "parents": [345] }],
+  "links": {
+    "parent": {
+      "href": "http://mime-types-api.vercel.app/api/345",
+      "type": "application/json",
+      "method": "GET"
+    },
+    "self": {
+      "href": "http://mime-types-api.vercel.app/api/345/extensions",
+      "type": "application/json",
+      "method": "GET"
+    }
+  }
+}</pre>
+</p>
+
 </body>
 </html>
