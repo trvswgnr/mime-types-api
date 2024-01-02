@@ -22,13 +22,7 @@ const ratelimit = new Ratelimit({
 
 export default async function middleware(request: Request) {
     const ip = ipAddress(request) || "127.0.0.1";
-    const {
-        success,
-        pending,
-        limit, // Maximum number of requests allowed within a window.
-        reset, // Unix timestamp in milliseconds when the limits are reset.
-        remaining, // How many requests the user has left within the current window.
-    } = await ratelimit.limit(ip);
+    const { success, pending, limit, reset, remaining } = await ratelimit.limit(ip);
 
     const status = 429;
     const message = "Too Many Requests";
@@ -44,21 +38,23 @@ export default async function middleware(request: Request) {
     const now = Date.now();
     const rateLimitReset = Math.max(Math.ceil((reset - now) / 1000), 0);
     const headers = {
-        // the requests quota in the time window.
+        /** the requests quota in the time window */
         "RateLimit-Limit": limit.toString(),
-        // the remaining requests quota in the current window.
+        /** the remaining requests quota in the current window */
         "RateLimit-Remaining": remaining.toString(),
-        // the time remaining in the current window, specified in seconds.
+        /** the time remaining in the current window, specified in seconds. */
         "RateLimit-Reset": rateLimitReset.toString(),
     };
-    return success
-        ? next({ headers })
-        : new Response(JSON.stringify(body), {
-              status,
-              headers: {
-                  "Content-Type": "application/json",
-                  "Retry-After": new Date(reset).toUTCString(),
-                  ...headers,
-              },
-          });
+    if (success) {
+        return next({ headers });
+    }
+
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: {
+            "Content-Type": "application/json",
+            "Retry-After": new Date(reset).toUTCString(),
+            ...headers,
+        },
+    });
 }
