@@ -14,7 +14,10 @@ export default async function handler(request: VercelRequest, response: VercelRe
             return response.status(400).json({ error: "ext must be a string" });
         }
         const mimeTypes = await getMimeTypesForExtension(ext, url);
-        return response.status(200).json(mimeTypes);
+        return response
+            .status(200)
+            .setHeader("Content-Type", "application/json")
+            .send(JSON.stringify(mimeTypes));
     }
 }
 
