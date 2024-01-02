@@ -10,9 +10,18 @@ export async function getOne<O extends QueryResultRow>(
 
 export function getUrl(request: VercelRequest): URL {
     if (!request.url) throw new Error("Request has no URL");
-    const protocol = request.headers.referer?.split("://")[0] ?? "http";
+    const protocol = getProtocol(request);
     const url = new URL(request.url, `${protocol}://${request.headers.host}`);
     return url;
+}
+
+function getProtocol(request: VercelRequest): string {
+    let forwarded = request.headers["x-forwarded-proto"];
+    forwarded = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+    if (forwarded) {
+        return forwarded;
+    }
+    return request.headers.referer?.split("://")[0] ?? "http";
 }
 
 export function makeLink(

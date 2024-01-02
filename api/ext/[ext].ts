@@ -1,20 +1,26 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { sql } from "@vercel/postgres";
-import { makeLink } from "../../util.js";
+import { getUrl, makeLink } from "../../util.js";
 
 const DELIMITER = ",";
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
-    if (!request.url) return response.status(400);
-    const protocol = request.headers.referer?.split("://")[0] ?? "http";
-    const url = new URL(request.url, `${protocol}://${request.headers.host}`);
+    const url = getUrl(request);
     if (request.method === "GET") {
         const { ext } = request.query;
         if (typeof ext !== "string") {
             return response.status(400).json({ error: "ext must be a string" });
         }
         const mimeTypes = await getMimeTypesForExtension(ext, url);
-        return response.status(200).json(mimeTypes);
+        const space = request.query.pretty ? 4 : undefined;
+        const body = {
+            ...mimeTypes,
+            headers: request.headers,
+        };
+        return response
+            .status(200)
+            .setHeader("Content-Type", "application/json")
+            .send(JSON.stringify(body, undefined, space));
     }
 }
 
@@ -46,7 +52,7 @@ async function getMimeTypesForExtension(extension: string, url: URL) {
         names.push(...parentOf);
     }
     return {
-        data: names,
+        data: names.filter(Boolean),
         links: {
             parent: makeLink(url, parentId),
         },
