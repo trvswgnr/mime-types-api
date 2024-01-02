@@ -8,14 +8,14 @@
 <body>
     <h1>MIME Types API</h1>
     <p>API to get MIME types of files</p>
-    <p>Usage: <code>https://mime-types-api.vercel.app/api/ext/{extension}</code></p>
-    <p>Example: <code>https://mime-types-api.vercel.app/api/ext/pdf</code></p>
+    <p><strong>Usage</strong>: <code>https://mime-types-api.vercel.app/api/ext/{extension}</code></p>
+    <p><strong>Example</strong>: <code>https://mime-types-api.vercel.app/api/ext/pdf</code></p>
 
     <h2>Endpoints</h2>
     <h3><code>GET</code> /api/ext/{extension}</h3>
     <p>Get MIME types of a file extension</p>
-    <p>Example: <code>https://mime-types-api.vercel.app/api/ext/pdf</code></p>
-    <p>Response:
+    <p><strong>Example</strong>: <code>https://mime-types-api.vercel.app/api/ext/pdf</code></p>
+    <p><strong>Response</strong>:
         <pre>{
   "data": ["application/pdf"],
   "links": {
@@ -27,8 +27,8 @@
 </p>
     <h3><code>GET</code> /api/{id}</h3>
     <p>Get a MIME type by its id</p>
-    <p>Example: <code>https://mime-types-api.vercel.app/api/345</code></p>
-    <p>Response:
+    <p><strong>Example</strong>: <code>https://mime-types-api.vercel.app/api/345</code></p>
+    <p><strong>Response</strong>:
         <pre>{
   "data": {
     "id": 345,
@@ -58,8 +58,8 @@
 </p>
     <h3><code>GET</code> /api/{id}/links</h3>
     <p>Get links of a MIME type by its id</p>
-    <p>Example: <code>https://mime-types-api.vercel.app/api/345/links</code></p>
-    <p>Response:
+    <p><strong>Example</strong>: <code>https://mime-types-api.vercel.app/api/345/links</code></p>
+    <p><strong>Response</strong>:
         <pre>{
   "data": {
     "id": 389,
@@ -85,8 +85,8 @@
 </p>
     <h3><code>GET</code> /api/{id}/extensions</h3>
     <p>Get extensions of a MIME type by its id</p>
-    <p>Example: <code>https://mime-types-api.vercel.app/api/345/extensions</code></p>
-    <p>Response:
+    <p><strong>Example</strong>: <code>https://mime-types-api.vercel.app/api/345/extensions</code></p>
+    <p><strong>Response</strong>:
         <pre>{
   "data": [{ "id": 519, "name": ".pdf", "parents": [345] }],
   "links": {
