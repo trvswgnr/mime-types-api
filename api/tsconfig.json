@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+      "lib": ["ESNext"],
+      "target": "ESNext",
+      "module": "NodeNext",
+      "moduleDetection": "force",
+      "allowJs": true,
+      "moduleResolution": "NodeNext",
+      "noEmit": true,
+      "skipLibCheck": true,
+      "strict": true,
+      "noFallthroughCasesInSwitch": true,
+      "forceConsistentCasingInFileNames": true
+    }
+  }
+  

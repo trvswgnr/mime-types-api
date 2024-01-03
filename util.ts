@@ -1,11 +1,24 @@
-import type { VercelRequest } from "@vercel/node";
-import type { QueryResult, QueryResultRow } from "@vercel/postgres";
+import type { VercelRequest, VercelRequestQuery, VercelResponse } from "@vercel/node";
+import {
+    VercelClient,
+    type QueryResult,
+    type QueryResultRow,
+    createClient,
+} from "@vercel/postgres";
 
 export async function getOne<O extends QueryResultRow>(
     arg: Promise<QueryResult<O>>
 ): Promise<O | null> {
     const result = await arg;
     return result.rows[0] ?? null;
+}
+
+export function getQueryParam(key: string, query: VercelRequestQuery): string | null {
+    const value = query[key];
+    if (Array.isArray(value)) {
+        return value[0];
+    }
+    return value ?? null;
 }
 
 export function getUrl(request: VercelRequest): URL {
@@ -23,7 +36,7 @@ export function makeLink(
     type = "application/json"
 ) {
     const _endpoint: string = endpoint.startsWith("/") ? endpoint.slice(1) : endpoint;
-    let href = `${url.origin}/api/${id}/${_endpoint}`;
+    let href = `/api/${id}/${_endpoint}`;
     if (href.endsWith("/")) {
         href = href.slice(0, -1);
     }
@@ -69,3 +82,44 @@ export type LinksRow = {
     parent_of: string;
     alternative_to: string;
 };
+
+export type Result<T, E> = readonly [T, null] | readonly [null, E];
+
+export function Ok<T>(value: T) {
+    return [value, null] as const;
+}
+
+export function Err<E>(error: E) {
+    return [null, error] as const;
+}
+
+export class ResponseError extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+        super(message);
+        this.status = status;
+    }
+}
+
+export type ResponseResult = Result<Body, ResponseError>;
+export type Body = string | number | boolean | { [key: string]: Body } | Body[];
+export type BodyFn = (sql: SQLFn) => Promise<ResponseResult>;
+export type SQLFn = VercelClient["sql"];
+
+export async function withClient(fn: BodyFn) {
+    const client = createClient();
+    await client.connect();
+    const sql = client.sql.bind(client);
+    try {
+        const [body, error] = await fn(sql);
+        if (error) {
+            return { body: { error: error.message }, status: error.status };
+        }
+        return { body, status: 200 };
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error("unknown error");
+        return { body: { error: error.message }, status: 500 };
+    } finally {
+        await client.end();
+    }
+}

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { sql } from "@vercel/postgres";
-import { getUrl, makeLink } from "../../util.js";
+import { getUrl, makeLink } from "../../../util.js";
 
 const DELIMITER = ",";
 

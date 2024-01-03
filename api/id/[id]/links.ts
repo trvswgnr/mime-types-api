@@ -1,8 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { sql } from "@vercel/postgres";
-import { getOne, getUrl, makeLink, type LinksRow, type MimeTypeRow } from "../../util.js";
+import { getOne, getUrl, makeLink, type LinksRow, type MimeTypeRow } from "../../../util.js";
 
-const DELIMITER = ",";
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
     const url = getUrl(request);
@@ -15,7 +14,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
             const mime_type_id = links.mime_type_id;
             return response.status(200).json({
                 data: links,
-                links: {
+                _links: {
                     parent: makeLink(url, mime_type_id),
                     self: makeLink(url, mime_type_id, "/links"),
                 },

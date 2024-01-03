@@ -1,5 +1,7 @@
-import { sql, type QueryResult, type QueryResultRow } from "@vercel/postgres";
+import { type QueryResult, type QueryResultRow } from "@vercel/postgres";
 import mimeTypes from "./mime-types.json";
+import { createTable, sql } from "./orm";
+import { MimeTypeTable, type MimeTypeSchema } from "./schema/MimeType";
 
 const DELIMITER = ",";
 
@@ -26,11 +28,11 @@ if (args.includes("seed")) {
 
 async function dropTables() {
     console.log("Dropping database tables...");
-    await sql`DROP TABLE notices;`.catch(handleError);
-    await sql`DROP TABLE further_reading;`.catch(handleError);
-    await sql`DROP TABLE file_types;`.catch(handleError);
-    await sql`DROP TABLE links;`.catch(handleError);
-    await sql`DROP TABLE mime_types CASCADE;`.catch(handleError);
+    await sql(`DROP TABLE notices;`).catch(handleError);
+    await sql(`DROP TABLE further_reading;`).catch(handleError);
+    await sql(`DROP TABLE file_types;`).catch(handleError);
+    await sql(`DROP TABLE links;`).catch(handleError);
+    await sql(`DROP TABLE mime_types CASCADE;`).catch(handleError);
     console.log("Database tables dropped!");
 }
 
@@ -40,17 +42,9 @@ function handleError(error: Error) {
 
 async function createTables() {
     console.log("Creating database tables...");
-    const createMimeTypeTable = () => sql`
-        CREATE TABLE mime_types (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(500) NOT NULL UNIQUE,
-            description TEXT,
-            deprecated BOOLEAN DEFAULT FALSE,
-            use_instead VARCHAR(500)
-        );
-    `;
-
-    const createLinksTable = () => sql`
+    const createMimeTypeTable = () => createTable("mime_types", MimeTypeTable);
+    const createLinksTable = () =>
+        sql(`
         CREATE TABLE links (
             id SERIAL PRIMARY KEY,
             mime_type_id INT REFERENCES mime_types(id),
@@ -59,28 +53,30 @@ async function createTables() {
             parent_of VARCHAR(500),
             alternative_to VARCHAR(500)
         );
-    `;
+    `);
 
     const createFileTypesTable = async () => {
-        await sql`
+        await sql(`
             CREATE TABLE file_types (
                 id SERIAL PRIMARY KEY,
                 file_type VARCHAR(500) NOT NULL UNIQUE,
                 mime_type_ids VARCHAR(500) NOT NULL
             );
-        `;
+        `);
     };
 
-    const createFurtherReadingTable = () => sql`
+    const createFurtherReadingTable = () =>
+        sql(`
         CREATE TABLE further_reading (
             id SERIAL PRIMARY KEY,
             mime_type_id INT REFERENCES mime_types(id),
             title VARCHAR(500) NOT NULL,
             url VARCHAR(500) NOT NULL
         );
-    `;
+    `);
 
-    const createNoticesTable = () => sql`
+    const createNoticesTable = () =>
+        sql(`
         CREATE TABLE notices (
             id SERIAL PRIMARY KEY,
             mime_type_id INT REFERENCES mime_types(id),
@@ -88,7 +84,7 @@ async function createTables() {
             community_contributed BOOLEAN DEFAULT FALSE,
             popular_usage VARCHAR(500)
         );
-    `;
+    `);
 
     await createMimeTypeTable();
     const results = await Promise.allSettled([
@@ -113,23 +109,27 @@ async function createTables() {
 async function seedDb(mimeTypes: MimeType[]): Promise<void> {
     console.log("Seeding database...");
     const insertMimeType = (mimeType: SnakeCaseKeys<MimeType>) => {
-        return sql<{ id: number }>`
+        return sql<MimeTypeSchema>(
+            `
             INSERT INTO mime_types (
                 name,
                 description,
                 deprecated,
                 use_instead
             ) VALUES (
-                ${mimeType.name},
-                ${mimeType.description},
-                ${mimeType.deprecated},
-                ${mimeType.use_instead}
+                $1,
+                $2,
+                $3,
+                $4
             ) RETURNING id;
-        `;
+        `,
+            [mimeType.name, mimeType.description, mimeType.deprecated, mimeType.use_instead]
+        );
     };
 
     const insertLinks = (mimeTypeID: number, links: SnakeCaseKeys<MimeType>["links"]) => {
-        return sql`
+        return sql(
+            `
             INSERT INTO links (
                 mime_type_id,
                 deprecates,
@@ -137,13 +137,21 @@ async function seedDb(mimeTypes: MimeType[]): Promise<void> {
                 parent_of,
                 alternative_to
             ) VALUES (
-                ${mimeTypeID},
-                ${links.deprecates.join(DELIMITER)},
-                ${links.related_to.join(DELIMITER)},
-                ${links.parent_of.join(DELIMITER)},
-                ${links.alternative_to.join(DELIMITER)}
+                $1,
+                $2,
+                $3,
+                $4,
+                $5
             );
-        `;
+        `,
+            [
+                mimeTypeID,
+                links.deprecates.join(DELIMITER),
+                links.related_to.join(DELIMITER),
+                links.parent_of.join(DELIMITER),
+                links.alternative_to.join(DELIMITER),
+            ]
+        );
     };
 
     const insertFileTypes = async (
@@ -152,30 +160,32 @@ async function seedDb(mimeTypes: MimeType[]): Promise<void> {
     ) => {
         for (const fileType of fileTypes) {
             // first, check if the file type already exists in the file_types table
-            const { rows: existingMimeTypeIds } = await sql<{ mime_type_ids: string }>`
-                SELECT mime_type_ids FROM file_types WHERE file_type = ${fileType};
-            `;
+            const { rows: existingMimeTypeIds } = await sql<{ mime_type_ids: string }>(
+                `SELECT mime_type_ids FROM file_types WHERE file_type = $1;`,
+                [fileType]
+            );
             if (existingMimeTypeIds.length) {
                 // if the file type already exists, add the mime type id to the mime_type_ids array
                 const mime_type_ids = existingMimeTypeIds[0].mime_type_ids;
-                await sql`
-                    UPDATE file_types SET mime_type_ids = ${mime_type_ids + DELIMITER + mimeTypeID}
-                        WHERE file_type = ${fileType};
-                `;
+                await sql(`UPDATE file_types SET mime_type_ids = $1 WHERE file_type = $2;`, [
+                    mime_type_ids + DELIMITER + mimeTypeID,
+                    fileType,
+                ]);
                 continue;
             }
             // if the file type doesn't exist yet, insert it into the file_types table
-            await sql<{ id: number }>`
+            await sql(
+                `
                 INSERT INTO file_types (
                     file_type,
                     mime_type_ids
                 ) VALUES (
-                    ${fileType},
-                    ${mimeTypeID}
-                ) on conflict (file_type) do update set mime_type_ids = file_types.mime_type_ids || ${
-                    DELIMITER + mimeTypeID
-                }
-            `;
+                    $1,
+                    $2
+                ) on conflict (file_type) do update set mime_type_ids = file_types.mime_type_ids || $3;
+            `,
+                [fileType, mimeTypeID, DELIMITER + mimeTypeID]
+            );
         }
     };
 
@@ -184,34 +194,45 @@ async function seedDb(mimeTypes: MimeType[]): Promise<void> {
         furtherReading: SnakeCaseKeys<MimeType>["further_reading"]
     ) => {
         for (const { title, url } of furtherReading) {
-            await sql`
+            await sql(
+                `
                 INSERT INTO further_reading (
                     mime_type_id,
                     title,
                     url
                 ) VALUES (
-                    ${mimeTypeID},
-                    ${title},
-                    ${url}
+                    $1,
+                    $2,
+                    $3
                 );
-            `;
+            `,
+                [mimeTypeID, title, url]
+            );
         }
     };
 
     const insertNotices = (mimeTypeID: number, notices: SnakeCaseKeys<MimeType>["notices"]) => {
-        return sql`
+        return sql(
+            `
             INSERT INTO notices (
                 mime_type_id,
                 has_no_official,
                 community_contributed,
                 popular_usage
             ) VALUES (
-                ${mimeTypeID},
-                ${notices.has_no_official},
-                ${notices.community_contributed},
-                ${notices.popular_usage}
+                $1,
+                $2,
+                $3,
+                $4
             );
-        `;
+        `,
+            [
+                mimeTypeID,
+                notices.has_no_official,
+                notices.community_contributed,
+                notices.popular_usage,
+            ]
+        );
     };
 
     let lastId = -1;
@@ -267,25 +288,29 @@ if (args.includes("test")) {
 }
 
 async function getMimeType(type: string): Promise<MimeType> {
-    const mimeTypeRow = await getOne(sql<MimeTypeRow>`
-        SELECT * FROM mime_types WHERE name = ${type};
-    `);
+    const mimeTypeRow = await getOne(sql(`SELECT * FROM mime_types WHERE name = ${type};`));
     if (!mimeTypeRow) throw new Error(`No mime type found for ${type}`);
-    const linksRow = await getOne(sql`
-        SELECT * FROM links WHERE mime_type_id = ${mimeTypeRow.id};
-    `);
+    const linksRow = await getOne(
+        sql(`SELECT * FROM links WHERE mime_type_id = ${mimeTypeRow.id};`)
+    );
     if (!linksRow) throw new Error(`No links found for ${type}`);
-    const fileTypesRow = await getOne(sql`
-        SELECT * FROM file_types WHERE mime_type_ids LIKE ${`%${mimeTypeRow.id}%`};
-    `);
+    const fileTypesRow = await getOne(
+        sql(`SELECT * FROM file_types WHERE mime_type_ids LIKE ${`%${mimeTypeRow.id}%`};`)
+    );
     if (!fileTypesRow) throw new Error(`No file types found for ${type}`);
-    const furtherReadingRows = await sql`
-        SELECT * FROM further_reading WHERE mime_type_id = ${mimeTypeRow.id};
-    `;
+    type FurtherReadingRows = {
+        id: number;
+        mime_type_id: number;
+        title: string;
+        url: string;
+    };
+    const furtherReadingRows = await sql<FurtherReadingRows>(
+        `SELECT * FROM further_reading WHERE mime_type_id = ${mimeTypeRow.id};`
+    );
     if (!furtherReadingRows) throw new Error(`No further reading found for ${type}`);
-    const noticesRow = await getOne(sql`
-        SELECT * FROM notices WHERE mime_type_id = ${mimeTypeRow.id};
-    `);
+    const noticesRow = await getOne(
+        sql(`SELECT * FROM notices WHERE mime_type_id = ${mimeTypeRow.id};`)
+    );
     if (!noticesRow) throw new Error(`No notices found for ${type}`);
 
     const mimeType: MimeType = {
@@ -312,7 +337,13 @@ async function getMimeType(type: string): Promise<MimeType> {
     return mimeType;
 }
 
-async function getOne<O extends QueryResultRow>(arg: Promise<QueryResult<O>>): Promise<O | null> {
+async function getOne(arg: Promise<any>): Promise<any>;
+async function getOne<O extends QueryResultRow>(arg: Promise<QueryResult<O>>): Promise<O | null>;
+async function getOne<O extends QueryResultRow>(arg: Promise<any> | Promise<QueryResult<O>>) {
+    if (typeof arg === "string") {
+        const result = await sql(arg);
+        return result.rows[0] ?? null;
+    }
     const result = await arg;
     return result.rows[0] ?? null;
 }
@@ -359,11 +390,3 @@ type SnakeCaseKeys<T> = {
 type CamelToSnakeCase<S extends string> = S extends `${infer P1}${infer P2}`
     ? `${P1 extends Capitalize<P1> ? "_" : ""}${Lowercase<P1>}${CamelToSnakeCase<P2>}`
     : S;
-
-type MimeTypeRow = {
-    id: number;
-    name: string;
-    description: string;
-    deprecated: boolean;
-    use_instead: string;
-};
