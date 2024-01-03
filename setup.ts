@@ -1,7 +1,141 @@
 import { type QueryResult, type QueryResultRow } from "@vercel/postgres";
-import mimeTypes from "./mime-types.json";
+import _mimeTypes from "./mime-types.json";
 import { createTable, sql } from "./orm";
 import { MimeTypeTable, type MimeTypeSchema } from "./schema/MimeType";
+
+const ogMimeTypes = _mimeTypes as MimeType[];
+const mimeTypes: Record<string, any>[] = [];
+for (const mimeType of ogMimeTypes) {
+    mimeTypes.push(mimeType);
+}
+for (const mimeType of ogMimeTypes) {
+    for (const type in mimeType.links.deprecates) {
+        const name = mimeType.links.deprecates[type];
+        if (alreadyExists(name)) {
+            const existing = getMimeTypeByName(name);
+            if (!existing) continue;
+            const childOf = existing?.links?.childOf;
+            if (!childOf) {
+                existing.links.childOf = [mimeType.name];
+            }
+            if (!childOf?.includes(mimeType.name)) {
+                existing.links.childOf.push(mimeType.name);
+            }
+            existing.deprecated = true;
+            continue;
+        }
+        mimeTypes.push({
+            name: name,
+            description: "",
+            links: {
+                childOf: [mimeType.name],
+                deprecates: [],
+                relatedTo: [],
+                parentOf: [],
+                alternativeTo: [],
+            } as any,
+            fileTypes: [],
+            furtherReading: [],
+            notices: {
+                hasNoOfficial: false,
+                communityContributed: false,
+                popularUsage: null,
+            },
+            deprecated: true,
+        });
+    }
+    for (const type in mimeType.links.relatedTo) {
+        const name = mimeType.links.relatedTo[type];
+        if (alreadyExists(name)) {
+            const existing = getMimeTypeByName(name);
+            if (!existing) continue;
+            (existing.links as any).relatedTo.push(mimeType.name);
+            continue;
+        }
+        mimeTypes.push({
+            name: name,
+            description: "",
+            links: {
+                childOf: [],
+                deprecates: [],
+                relatedTo: [mimeType.name],
+                parentOf: [],
+                alternativeTo: [],
+            } as any,
+            fileTypes: [],
+            furtherReading: [],
+            notices: {
+                hasNoOfficial: false,
+                communityContributed: false,
+                popularUsage: null,
+            },
+        });
+    }
+
+    for (const type in mimeType.links.parentOf) {
+        const name = mimeType.links.parentOf[type];
+        if (alreadyExists(name)) {
+            const existing = getMimeTypeByName(name);
+            if (!existing) continue;
+            (existing.links as any).childOf.push(mimeType.name);
+            continue;
+        }
+        mimeTypes.push({
+            name: name,
+            description: "",
+            links: {
+                childOf: [mimeType.name],
+                deprecates: [],
+                relatedTo: [],
+                parentOf: [],
+                alternativeTo: [],
+            } as any,
+            fileTypes: [],
+            furtherReading: [],
+            notices: {
+                hasNoOfficial: false,
+                communityContributed: false,
+                popularUsage: null,
+            },
+        });
+    }
+
+    for (const type in mimeType.links.alternativeTo) {
+        const name = mimeType.links.alternativeTo[type];
+        if (alreadyExists(name)) {
+            const existing = getMimeTypeByName(name);
+            if (!existing) continue;
+            (existing.links as any).alternativeTo.push(mimeType.name);
+            continue;
+        }
+        mimeTypes.push({
+            name: name,
+            description: "",
+            links: {
+                childOf: [],
+                deprecates: [],
+                relatedTo: [],
+                parentOf: [],
+                alternativeTo: [mimeType.name],
+            } as any,
+            fileTypes: [],
+            furtherReading: [],
+            notices: {
+                hasNoOfficial: false,
+                communityContributed: false,
+                popularUsage: null,
+            },
+        });
+    }
+}
+
+function getMimeTypeByName(name: string) {
+    return mimeTypes.find((mimeType) => mimeType.name === name);
+}
+
+function alreadyExists(name: string) {
+    return mimeTypes.some((mimeType) => mimeType.name === name);
+}
 
 const DELIMITER = ",";
 
@@ -20,7 +154,7 @@ if (args.includes("create")) {
 }
 
 if (args.includes("seed")) {
-    await seedDb(mimeTypes).catch((error) => {
+    await seedDb(mimeTypes as any).catch((error) => {
         console.error(error.message);
         process.exit(1);
     });
@@ -30,7 +164,8 @@ async function dropTables() {
     console.log("Dropping database tables...");
     await sql(`DROP TABLE notices;`).catch(handleError);
     await sql(`DROP TABLE further_reading;`).catch(handleError);
-    await sql(`DROP TABLE file_types;`).catch(handleError);
+    await sql(`DROP TABLE extensions;`).catch(handleError);
+    await sql(`DROP TYPE link_type;`).catch(handleError);
     await sql(`DROP TABLE links;`).catch(handleError);
     await sql(`DROP TABLE mime_types CASCADE;`).catch(handleError);
     console.log("Database tables dropped!");
@@ -43,24 +178,32 @@ function handleError(error: Error) {
 async function createTables() {
     console.log("Creating database tables...");
     const createMimeTypeTable = () => createTable("mime_types", MimeTypeTable);
-    const createLinksTable = () =>
-        sql(`
-        CREATE TABLE links (
-            id SERIAL PRIMARY KEY,
-            mime_type_id INT REFERENCES mime_types(id),
-            deprecates VARCHAR(500),
-            related_to VARCHAR(500),
-            parent_of VARCHAR(500),
-            alternative_to VARCHAR(500)
-        );
-    `);
+    const createLinksTable = async () => {
+        await sql(`
+            CREATE TYPE link_type AS ENUM (
+                'deprecates',
+                'related_to',
+                'parent_of',
+                'child_of',
+                'alternative_to'
+            );
+        `);
+        return await sql(`
+            CREATE TABLE links (
+                id SERIAL PRIMARY KEY,
+                mime_type_id INT REFERENCES mime_types(id),
+                type link_type NOT NULL,
+                link TEXT NOT NULL
+            );
+        `);
+    };
 
     const createFileTypesTable = async () => {
         await sql(`
-            CREATE TABLE file_types (
+            CREATE TABLE extensions (
                 id SERIAL PRIMARY KEY,
-                file_type VARCHAR(500) NOT NULL UNIQUE,
-                mime_type_ids VARCHAR(500) NOT NULL
+                mime_type_id INT REFERENCES mime_types(id),
+                extension VARCHAR(500) NOT NULL
             );
         `);
     };
@@ -128,29 +271,28 @@ async function seedDb(mimeTypes: MimeType[]): Promise<void> {
     };
 
     const insertLinks = (mimeTypeID: number, links: SnakeCaseKeys<MimeType>["links"]) => {
-        return sql(
-            `
-            INSERT INTO links (
-                mime_type_id,
-                deprecates,
-                related_to,
-                parent_of,
-                alternative_to
-            ) VALUES (
-                $1,
-                $2,
-                $3,
-                $4,
-                $5
-            );
-        `,
-            [
-                mimeTypeID,
-                links.deprecates.join(DELIMITER),
-                links.related_to.join(DELIMITER),
-                links.parent_of.join(DELIMITER),
-                links.alternative_to.join(DELIMITER),
-            ]
+        const linkTypes = Object.keys(links) as (keyof typeof links)[];
+        return Promise.all(
+            linkTypes.map(async (linkType) => {
+                const link = links[linkType];
+                if (!link.length) return;
+                for (const url of link) {
+                    await sql(
+                        `
+                        INSERT INTO links (
+                            mime_type_id,
+                            type,
+                            link
+                        ) VALUES (
+                            $1,
+                            $2,
+                            $3
+                        );
+                    `,
+                        [mimeTypeID, linkType, url]
+                    );
+                }
+            })
         );
     };
 
@@ -159,32 +301,17 @@ async function seedDb(mimeTypes: MimeType[]): Promise<void> {
         fileTypes: SnakeCaseKeys<MimeType>["file_types"]
     ) => {
         for (const fileType of fileTypes) {
-            // first, check if the file type already exists in the file_types table
-            const { rows: existingMimeTypeIds } = await sql<{ mime_type_ids: string }>(
-                `SELECT mime_type_ids FROM file_types WHERE file_type = $1;`,
-                [fileType]
-            );
-            if (existingMimeTypeIds.length) {
-                // if the file type already exists, add the mime type id to the mime_type_ids array
-                const mime_type_ids = existingMimeTypeIds[0].mime_type_ids;
-                await sql(`UPDATE file_types SET mime_type_ids = $1 WHERE file_type = $2;`, [
-                    mime_type_ids + DELIMITER + mimeTypeID,
-                    fileType,
-                ]);
-                continue;
-            }
-            // if the file type doesn't exist yet, insert it into the file_types table
             await sql(
                 `
-                INSERT INTO file_types (
-                    file_type,
-                    mime_type_ids
+                INSERT INTO extensions (
+                    mime_type_id,
+                    extension
                 ) VALUES (
                     $1,
                     $2
-                ) on conflict (file_type) do update set mime_type_ids = file_types.mime_type_ids || $3;
+                );
             `,
-                [fileType, mimeTypeID, DELIMITER + mimeTypeID]
+                [mimeTypeID, fileType]
             );
         }
     };

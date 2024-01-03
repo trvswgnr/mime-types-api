@@ -27,24 +27,30 @@ export function getUrl(request: VercelRequest): URL {
     const url = new URL(request.url, `${protocol}://${request.headers.host}`);
     return url;
 }
-
+type Link = {
+    href: string;
+    type?: string;
+    rel?: string;
+    templated?: boolean;
+};
+type VerbsUpper = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+type VerbsLower = Lowercase<VerbsUpper>;
+type Verbs = VerbsUpper | VerbsLower;
 export function makeLink(
     url: URL,
-    id: number,
-    endpoint: `/${string}` = "/",
-    method = "GET",
-    type = "application/json"
-) {
-    const _endpoint: string = endpoint.startsWith("/") ? endpoint.slice(1) : endpoint;
-    let href = `/api/${id}/${_endpoint}`;
-    if (href.endsWith("/")) {
-        href = href.slice(0, -1);
-    }
-    return {
-        href,
-        type,
-        method,
-    };
+    endpoint: `/${string}`,
+    relOrData?: string | { templated?: true; rel?: string; href?: string; type?: Verbs },
+    maybeType: Verbs = "GET"
+): Link {
+    const href = `${url.origin}/api${endpoint}`;
+    const type = typeof relOrData === "object" ? relOrData?.type ?? maybeType : maybeType;
+    const rel = typeof relOrData === "string" ? relOrData : relOrData?.rel;
+    const templated = typeof relOrData === "string" ? false : relOrData?.templated;
+    const link: Link = { href };
+    if (rel) link.rel = rel;
+    if (templated) link.templated = true;
+    if (type) link.type = type;
+    return link;
 }
 
 export type MimeTypeJSON = {
@@ -106,7 +112,16 @@ export type Body = string | number | boolean | { [key: string]: Body } | Body[];
 export type BodyFn = (sql: SQLFn) => Promise<ResponseResult>;
 export type SQLFn = VercelClient["sql"];
 
-export async function withClient(fn: BodyFn) {
+type Ret<T extends BodyFn> =
+    | {
+          body: Awaited<ReturnType<T>>;
+          status: 200;
+      }
+    | {
+          body: { error: string };
+          status: number;
+        };
+export async function withClient<const T extends BodyFn>(fn: T): Promise<Ret<T>> {
     const client = createClient();
     await client.connect();
     const sql = client.sql.bind(client);
@@ -115,7 +130,7 @@ export async function withClient(fn: BodyFn) {
         if (error) {
             return { body: { error: error.message }, status: error.status };
         }
-        return { body, status: 200 };
+        return { body, status: 200 } as any;
     } catch (err) {
         const error = err instanceof Error ? err : new Error("unknown error");
         return { body: { error: error.message }, status: 500 };

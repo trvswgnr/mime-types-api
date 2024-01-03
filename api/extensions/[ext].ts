@@ -58,7 +58,7 @@ function getMimeTypesForExtension(extension: string | null, url: URL) {
         return Ok({
             data: names,
             _links: {
-                parent: makeLink(url, parentId),
+                parent: makeLink(url, `/mimetypes/${parentId}`),
             },
         });
     };

@@ -13,13 +13,11 @@ export default async function handler(request: VercelRequest, response: VercelRe
     return await getFileExtensions(id)
         .then((fileExtensions) => {
             console.log(fileExtensions);
-            const ids = fileExtensions.flatMap((fileExtension) => fileExtension.parents);
-            const parentId = ids[0];
             return response.status(200).json({
                 data: fileExtensions,
                 links: {
-                    parent: makeLink(url, parentId),
-                    self: makeLink(url, parentId, "/extensions"),
+                    parent: makeLink(url, `/mimetypes/${id}`),
+                    self: makeLink(url, `/mimetypes/${id}/extensions`),
                 },
             });
         })

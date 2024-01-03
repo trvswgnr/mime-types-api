@@ -14,9 +14,9 @@ export default async function handler(request: VercelRequest, response: VercelRe
             return response.status(200).json({
                 data: mimeType,
                 _links: {
-                    links: makeLink(url, id, "/links"),
-                    extensions: makeLink(url, id, "/extensions"),
-                    self: makeLink(url, id),
+                    links: makeLink(url, `/mimetypes/${id}/links`),
+                    extensions: makeLink(url, `/mimetypes/${id}/extensions`),
+                    self: makeLink(url, `/mimetypes/${id}`),
                 },
             });
         })
