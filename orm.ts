@@ -84,18 +84,3 @@ export type SQLFn = {
     <T>(str: string, values?: any[]): Promise<QueryResults<T>>;
     <T>(strings: TemplateStringsArray, ...values: any[]): Promise<QueryResults<T>>;
 };
-
-/*
-this type:
-{
-    "SERIAL": number;
-    `VARCHAR(${number})`: string;
-    "TEXT": string;
-}
-becomes this type:
-{
-    "SERIAL": number;
-    "VARCHAR": string;
-    "TEXT": string;
-}
-*/

@@ -19,40 +19,36 @@ type DataTypesObj = typeof DataTypes;
 type DataTypes = Enum<typeof DataTypes>;
 const dtype: DataTypes = Math.random() > 0.5 ? DataTypes.SERIAL : DataTypes.VARCHAR(10);
 
-const x = Match(dtype as DataTypes, {
+const keys = Keys(dtype);
+const x = Match<Keys<DataTypes>, DataTypesObj, number>(keys, {
     SERIAL: () => 1,
-    VARCHAR: (x: any) => Number(x),
+    VARCHAR: (x) => Number(x),
     TEXT: () => 3,
     BOOLEAN: () => 4,
     INTEGER: () => 5,
     DECIMAL: () => 6,
-    // _: () => 6,
 });
 
-type Cases<T extends PropertyKey, R, C> = NoParensInKeys<{
-    [key in T]: (C)[keyof C] extends (arg: string) => any
-        ? (arg: string) => any
-        : () => C;
-}>
-export function Match<T extends PropertyKey, R, C>(
-    value: T,
-    cases: Cases<T, R, C>
-        // | (Partial<
-        //       NoParensInKeys<{
-        //           [key in T]: (typeof cases)[keyof typeof cases] extends (arg: string) => infer B
-        //               ? (arg: string) => B
-        //               : () => C;
-        //       }>
-        //   > & { _: () => R })
-): R {
-    const fn = (cases as any)[value];
-    // if ("_" in cases) {
-    //     return fn ? fn() : cases._();
-    // }
-    if (fn) {
-        return fn();
-    }
-    throw new Error(`Match failed for value ${String(value)}`);
+function Keys<T extends PropertyKey>(x: T): NoParensInUnion<T> {
+    return x as any;
+}
+type Keys<T extends PropertyKey> = NoParensInUnion<T>;
+
+type NoParensInUnion<T> = T extends `${infer U}(${infer _}` ? U : T;
+const testNoParensInUnion: NoParensInUnion<"SERIAL" | "VARCHAR(10)"> = "SERIAL";
+
+type Cases<T extends keyof U, U, Z> = {
+    [key in T]: U[key] extends (arg: infer X) => any ? (x: X) => Z : (x: U[key]) => Z;
+};
+
+type ReturnTypes<T> = {
+    [key in keyof T]: T[key] extends (...args: any[]) => infer U ? U : never;
+};
+function Match<T extends keyof ReturnTypes<U>, const U, const Z>(
+    x: T,
+    cases: NoParensInKeys<Cases<T, U, Z>>
+): Z {
+    return (cases as any)[x](x as any);
 }
 
 type NoParensInKeys<T> = {
