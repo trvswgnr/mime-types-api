@@ -37,38 +37,6 @@ export const ColumnType = {
     DECIMAL: "DECIMAL",
 } as const;
 
-export type Enum<T> = {
-    [key in keyof T]: T[key] extends (...args: any[]) => any ? ReturnType<T[key]> : T[key];
-}[keyof T];
-export const Enum = <const T>(obj: T) => obj;
-export function EnumVariant<const F extends (...args: any[]) => T, const T>(fn: F): F;
-export function EnumVariant<const T>(arg: T): T;
-export function EnumVariant(arg: unknown) {
-    return arg;
-}
-const DataTypes = Enum({
-    SERIAL: EnumVariant("SERIAL"),
-    VARCHAR: EnumVariant((x: number) => `VARCHAR(${x})`),
-    TEXT: EnumVariant("TEXT"),
-    BOOLEAN: EnumVariant("BOOLEAN"),
-    INTEGER: EnumVariant("INTEGER"),
-    DECIMAL: EnumVariant("DECIMAL"),
-});
-type DataTypes = Enum<typeof DataTypes>;
-const dtype: DataTypes = Math.random() > 0.5 ? DataTypes.SERIAL : DataTypes.VARCHAR(10);
-
-const x = Match(dtype, {
-    SERIAL: () => 1,
-    VARCHAR: () => 2,
-});
-
-export function Match<T extends PropertyKey, R>(
-    value: T,
-    cases: NoParensInKeys<{ [key in T]: () => R }>
-): R {
-    return (cases[value as unknown as keyof typeof cases] as any)();
-}
-
 export type Column =
     | {
           key: true;
@@ -131,6 +99,3 @@ becomes this type:
     "TEXT": string;
 }
 */
-type NoParensInKeys<T> = {
-    [key in keyof T as key extends `${infer U}(${infer _}` ? U : key]: T[key];
-};

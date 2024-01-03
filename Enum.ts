@@ -21,7 +21,7 @@ const dtype: DataTypes = Math.random() > 0.5 ? DataTypes.SERIAL : DataTypes.VARC
 
 const x = Match(dtype as DataTypes, {
     SERIAL: () => 1,
-    VARCHAR: (x) => Number(x),
+    VARCHAR: (x: any) => Number(x),
     TEXT: () => 3,
     BOOLEAN: () => 4,
     INTEGER: () => 5,
